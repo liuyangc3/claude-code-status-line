@@ -65,6 +65,25 @@ Add the `statusLine` block to your settings file.
 
 Replace `braille` / `weather` with any style: `simple`, `gradient`, `braille`, `ascii`, `weather`.
 
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--style <name>` | Choose a style: `simple`, `gradient`, `braille`, `ascii`, `weather` (default: `simple`) |
+| `--token` | Show token usage (input/output) right-aligned on the status line |
+| `--debug` | Write diagnostics to `statusline.log` next to the script |
+
+### Example with token display
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.py --style braille --token"
+  }
+}
+```
+
 ## References
 
 - [Claude Code StatusLine Rate Limits](https://nyosegawa.com/posts/claude-code-statusline-rate-limits/#pattern-5%3A-braille-dots)
