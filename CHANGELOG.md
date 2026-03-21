@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+### Fixed
+- Fix status line not showing on first load when Claude Code sends null values in status JSON
+- Use `or {}` / `or 0` instead of `.get()` defaults to handle JSON null values for `model`, `context_window`, `rate_limits`, and token counts
+
 ## 0.2.0
 
 ### Added
