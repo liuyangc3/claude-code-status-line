@@ -1,6 +1,6 @@
 [project]
 name = "claude-code-status-line"
-version = "0.1.0"
+version = "0.2.0"
 description = "customize claude code status line"
 authors = [{name = "liuyangc3", email = "liuyangc3@gmail.com"}]
 readme = "README.md"

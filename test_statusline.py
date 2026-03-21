@@ -2,6 +2,21 @@ from unittest.mock import patch
 from io import StringIO
 from statusline import SimpleStyle, GradientStyle, BrailleStyle, AsciiStyle, WeatherStyle
 
+ContextWindow =  {
+    "total_input_tokens":341,
+    "total_output_tokens":310,
+    "context_window_size":200000,
+    "current_usage":{
+        "input_tokens":3,
+        "output_tokens":300,
+        "cache_creation_input_tokens":978,
+        "cache_read_input_tokens":4383
+        },
+    "used_percentage":3,
+    "remaining_percentage":97
+}
+
+
 # ctx=10 (0-20), 5h=35 (20-40), 7d=50 (40-60)
 SAMPLE_LOW = {
     "model": {"display_name": "Claude Sonnet 4.6"},

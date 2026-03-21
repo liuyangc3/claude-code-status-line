@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
-import argparse, json, sys
-from typing import Any, Protocol, runtime_checkable
+
+"""
+ ▐▛███▜▌
+▝▜█████▛▘
+  ▘▘ ▝▝
+"""
+
+import argparse, json, os, re, shutil, sys
+from pathlib import Path
 
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8')
@@ -8,14 +15,45 @@ if sys.platform == 'win32':
 BLOCKS = ' ▏▎▍▌▋▊▉█'
 RESET = '\033[0m'
 DIM = '\033[2m'
+ANSI_RE = re.compile(r'\033\[[0-9;]*m')
 
 
-@runtime_checkable
-class Style(Protocol):
-    def render(self, data: dict[str, Any]) -> None: ...
+class TokenInfo:
+    @staticmethod
+    def visible_len(s):
+        return len(ANSI_RE.sub('', s))
+
+    @staticmethod
+    def format_num(n):
+        if n >= 1_000_000:
+            v = n / 1_000_000
+            return f'{v:.1f}m'.replace('.0m', 'm')
+        if n >= 1_000:
+            v = n / 1_000
+            return f'{v:.1f}k'.replace('.0k', 'k')
+        return str(n)
+
+    @staticmethod
+    def get_terminal_width():
+        try:
+            fd = os.open('/dev/tty', os.O_RDONLY)
+            try:
+                cols = os.get_terminal_size(fd).columns
+            finally:
+                os.close(fd)
+        except (ValueError, OSError):
+            cols = shutil.get_terminal_size().columns
+        return cols
+
+    @classmethod
+    def format(cls, data):
+        ctx = data.get('context_window', {})
+        in_tok = ctx.get('total_input_tokens', 0)
+        out_tok = ctx.get('total_output_tokens', 0)
+        return f'Token {DIM}│{RESET} {DIM}in:{RESET} {cls.format_num(in_tok)} {DIM}/ out:{RESET} {cls.format_num(out_tok)}'
 
 
-class SimpleStyle:
+class Style:
     def _format(self, label, pct):
         return f'{label} {round(pct)}%'
 
@@ -23,9 +61,8 @@ class SimpleStyle:
         model = data.get('model', {}).get('display_name', 'Unknow')
         parts = [model]
 
-        ctx = data.get('context_window', {}).get('used_percentage')
-        if ctx is not None:
-            parts.append(self._format('ctx', ctx))
+        ctx = data.get('context_window', {}).get('used_percentage', 0)
+        parts.append(self._format('ctx', ctx))
 
         five = data.get('rate_limits', {}).get('five_hour', {}).get('used_percentage')
         if five is not None:
@@ -37,12 +74,32 @@ class SimpleStyle:
 
         return parts
 
-    def render(self, data):
+    def render(self, data, debug=False, show_token=False):
         parts = self._parts(data)
-        print(f'{DIM}│{RESET}'.join(f' {p} ' for p in parts), end='')
+        left = f' {DIM}│{RESET} '.join(parts)
+        if not show_token:
+            print(left, end='')
+            return
+        token = TokenInfo.format(data)
+        width = TokenInfo.get_terminal_width()
+        left_len = TokenInfo.visible_len(left)
+        token_len = TokenInfo.visible_len(token)
+        token_col = width - token_len + 1
+        if debug:
+            diag = f'width={width} left={left_len} token={token_len} col={token_col}\n'
+            Path(__file__).parent.joinpath('statusline.log').write_text(diag)
+        pad = width - left_len - token_len - 8  # reserve 8 chars for Claude Code's right-side UI
+        if pad >= 2:
+            print(left + ' ' * pad + token, end='')
+        else:
+            print(left + f' {DIM}│{RESET} ' + token, end='')
 
 
-class GradientStyle(SimpleStyle):
+class SimpleStyle(Style):
+    pass
+
+
+class GradientStyle(Style):
     def _rgb_foreground(self, r, g, b):
         return f'\033[38;2;{r};{g};{b}m'
 
@@ -70,7 +127,7 @@ class GradientStyle(SimpleStyle):
         return f'{label} {self._color_gradient(pct)}{self._bar(pct)} {round(pct)}%{RESET}'
 
 
-class BrailleStyle(SimpleStyle):
+class BrailleStyle(Style):
     BRAILLE = ' ⣀⣄⣤⣦⣶⣷⣿'
 
     def _rgb_foreground(self, r, g, b):
@@ -103,12 +160,9 @@ class BrailleStyle(SimpleStyle):
     def _format(self, label, pct):
         return f'{DIM}{label}{RESET} {self._color_gradient(pct)}{self._bar(pct)}{RESET} {round(pct)}%'
 
-    def render(self, data):
-        parts = self._parts(data)
-        print(f' {DIM}│{RESET} '.join(parts), end='')
 
 
-class AsciiStyle(SimpleStyle):
+class AsciiStyle(Style):
     RAMP = ' .:-=+*#'
 
     def _rgb_foreground(self, r, g, b):
@@ -142,13 +196,8 @@ class AsciiStyle(SimpleStyle):
     def _format(self, label, pct):
         return f'{DIM}{label}{RESET} {self._color_gradient(pct)}[{self._bar(pct)}]{RESET} {round(pct)}%'
 
-    def render(self, data):
-        parts = self._parts(data)
-        print(f' {DIM}│{RESET} '.join(parts), end='')
 
-
-
-class WeatherStyle(SimpleStyle):
+class WeatherStyle(Style):
     WEATHER = ('☀️', '🌤️', '⛅', '🌧️', '⛈️')
 
     def _icon(self, pct):
@@ -166,12 +215,8 @@ class WeatherStyle(SimpleStyle):
     def _format(self, label, pct):
         return f'{DIM}{label}{RESET} {self._icon(pct)} {round(pct)}%'
 
-    def render(self, data):
-        parts = self._parts(data)
-        print(f' {DIM}│{RESET} '.join(parts), end='')
 
-
-STYLES: dict[str, Style] = {
+STYLES = {
     'simple': SimpleStyle(),
     'gradient': GradientStyle(),
     'braille': BrailleStyle(),
@@ -182,7 +227,10 @@ STYLES: dict[str, Style] = {
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--style', choices=STYLES, default='simple')
+    parser.add_argument('--token', action='store_true', default=False)
+    parser.add_argument('--debug', action='store_true', default=False)
     args = parser.parse_args()
 
-    data = json.load(sys.stdin)
-    STYLES[args.style].render(data)
+    raw = sys.stdin.read()
+    data = json.loads(raw)
+    STYLES[args.style].render(data, debug=args.debug, show_token=args.token)
