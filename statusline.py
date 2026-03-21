@@ -47,9 +47,9 @@ class TokenInfo:
 
     @classmethod
     def format(cls, data):
-        ctx = data.get('context_window', {})
-        in_tok = ctx.get('total_input_tokens', 0)
-        out_tok = ctx.get('total_output_tokens', 0)
+        ctx = data.get('context_window') or {}
+        in_tok = ctx.get('total_input_tokens') or 0
+        out_tok = ctx.get('total_output_tokens') or 0
         return f'Token {DIM}│{RESET} {DIM}in:{RESET} {cls.format_num(in_tok)} {DIM}/ out:{RESET} {cls.format_num(out_tok)}'
 
 
@@ -58,17 +58,17 @@ class Style:
         return f'{label} {round(pct)}%'
 
     def _parts(self, data):
-        model = data.get('model', {}).get('display_name', 'Unknow')
+        model = (data.get('model') or {}).get('display_name', 'Unknow')
         parts = [model]
 
-        ctx = data.get('context_window', {}).get('used_percentage', 0)
+        ctx = (data.get('context_window') or {}).get('used_percentage') or 0
         parts.append(self._format('ctx', ctx))
 
-        five = data.get('rate_limits', {}).get('five_hour', {}).get('used_percentage')
+        five = ((data.get('rate_limits') or {}).get('five_hour') or {}).get('used_percentage')
         if five is not None:
             parts.append(self._format('5h', five))
 
-        week = data.get('rate_limits', {}).get('seven_day', {}).get('used_percentage')
+        week = ((data.get('rate_limits') or {}).get('seven_day') or {}).get('used_percentage')
         if week is not None:
             parts.append(self._format('7d', week))
 
