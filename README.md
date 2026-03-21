@@ -75,6 +75,9 @@ Replace `braille` / `weather` with any style: `simple`, `gradient`, `braille`, `
 
 ### Example with token display
 
+<img width="705" height="39" alt="image" src="https://github.com/user-attachments/assets/7d732ad6-25c2-42bc-a201-2dad586781a7" />
+
+
 ```json
 {
   "statusLine": {
