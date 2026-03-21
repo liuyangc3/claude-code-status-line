@@ -6,23 +6,23 @@ A customizable status line for [Claude Code](https://docs.anthropic.com/en/docs/
 
 ### `simple` — plain text, no bars
 
-![simple](TODO)
+<img width="688" height="40" alt="simple" src="https://github.com/user-attachments/assets/9c354520-a970-4d71-b125-af3462ad7cab" />
 
 ### `gradient` — block bar with green-to-red color gradient
 
-![gradient](TODO)
+<img width="684" height="42" alt="gradient" src="https://github.com/user-attachments/assets/2cc401f2-4cf6-4637-a4b8-74a31ea3eff0" />
 
 ### `braille` — braille dot bar with color gradient
 
-![braille](TODO)
+<img width="661" height="46" alt="braille" src="https://github.com/user-attachments/assets/158db7ed-06fc-4473-9b5f-2580b8810fde" />
 
 ### `ascii` — ASCII density ramp with color gradient
 
-![ascii](TODO)
+<img width="693" height="41" alt="ascii" src="https://github.com/user-attachments/assets/74270ffa-7c56-4cdb-9b42-13b0d0636a76" />
 
 ### `weather` — single emoji icon per metric
 
-![weather](TODO)
+<img width="683" height="60" alt="weather" src="https://github.com/user-attachments/assets/69bf6da8-4590-4703-ac27-3c907d9056a3" />
 
 ## Requirements
 
@@ -64,3 +64,7 @@ Add the `statusLine` block to your settings file.
 ```
 
 Replace `braille` / `weather` with any style: `simple`, `gradient`, `braille`, `ascii`, `weather`.
+
+## References
+
+- [Claude Code StatusLine Rate Limits](https://nyosegawa.com/posts/claude-code-statusline-rate-limits/#pattern-5%3A-braille-dots)
