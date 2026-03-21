@@ -1,0 +1,16 @@
+[project]
+name = "claude-code-status-line"
+version = "0.1.0"
+description = "customize claude code status line"
+authors = [{name = "liuyangc3", email = "liuyangc3@gmail.com"}]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[tool.pytest.ini_options]
+addopts = "-s"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
