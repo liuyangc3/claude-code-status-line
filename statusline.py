@@ -6,7 +6,7 @@
   ▘▘ ▝▝
 """
 
-import argparse, json, os, re, shutil, sys
+import argparse, json, os, re, shutil, subprocess, sys
 from pathlib import Path
 
 if sys.platform == 'win32':
@@ -50,21 +50,30 @@ class TokenInfo:
         ctx = data.get('context_window') or {}
         in_tok = ctx.get('total_input_tokens') or 0
         out_tok = ctx.get('total_output_tokens') or 0
-        return f'Token {DIM}│{RESET} {DIM}in:{RESET} {cls.format_num(in_tok)} {DIM}/ out:{RESET} {cls.format_num(out_tok)}'
+        return f'Token {DIM}|{RESET} {DIM}in:{RESET} {cls.format_num(in_tok)} {DIM}/ out:{RESET} {cls.format_num(out_tok)}'
 
 
 class Style:
-    def _format(self, label, pct):
-        return f'{label} {round(pct)}%'
+    def _format(self, label, pct, suffix=''):
+        return f'{label} {suffix}({round(pct)}%)' if suffix else f'{label} {round(pct)}%'
 
-    def _parts(self, data):
+    def _parts(self, data, show_git=False):
         model = (data.get('model') or {}).get('display_name', 'Unknow')
         parts = [model]
 
-        ctx = (data.get('context_window') or {}).get('used_percentage') or 0
-        parts.append(self._format('ctx', ctx))
+        cw = data.get('context_window') or {}
+        ctx_pct = cw.get('used_percentage') or 0
+        used = (cw.get('total_input_tokens') or 0) + (cw.get('total_output_tokens') or 0)
+        size = cw.get('context_window_size') or 0
+        ctx_suffix = f'[{TokenInfo.format_num(used)}/{TokenInfo.format_num(size)}]' if size else ''
+        parts.append(self._format('ctx', ctx_pct, ctx_suffix))
 
-        five = ((data.get('rate_limits') or {}).get('five_hour') or {}).get('used_percentage')
+        if show_git:
+            branch = self._git_branch(data)
+            if branch:
+                parts.append(f'\033[38;2;255;105;180m⎇ {branch}{RESET}')
+
+        five =((data.get('rate_limits') or {}).get('five_hour') or {}).get('used_percentage')
         if five is not None:
             parts.append(self._format('5h', five))
 
@@ -74,9 +83,24 @@ class Style:
 
         return parts
 
-    def render(self, data, debug=False, show_token=False):
-        parts = self._parts(data)
-        left = f' {DIM}│{RESET} '.join(parts)
+    @staticmethod
+    def _git_branch(data):
+        cwd = data.get('cwd') or (data.get('workspace') or {}).get('current_dir')
+        if not cwd:
+            return None
+        try:
+            r = subprocess.run(
+                ['git', 'branch', '--show-current'],
+                cwd=cwd, capture_output=True, text=True, timeout=2)
+            if r.returncode == 0 and r.stdout.strip():
+                return r.stdout.strip()
+        except Exception:
+            pass
+        return None
+
+    def render(self, data, debug=False, show_token=False, show_git=False):
+        parts = self._parts(data, show_git=show_git)
+        left = f' {DIM}|{RESET} '.join(parts)
         if not show_token:
             print(left, end='')
             return
@@ -92,7 +116,7 @@ class Style:
         if pad >= 2:
             print(left + ' ' * pad + token, end='')
         else:
-            print(left + f' {DIM}│{RESET} ' + token, end='')
+            print(left + f' {DIM}|{RESET} ' + token, end='')
 
 
 class SimpleStyle(Style):
@@ -123,8 +147,8 @@ class GradientStyle(Style):
             green = int(200 - (pct - 50) * 4)
             return self._rgb_foreground(255, max(green, 0), 60)
 
-    def _format(self, label, pct):
-        return f'{label} {self._color_gradient(pct)}{self._bar(pct)} {round(pct)}%{RESET}'
+    def _format(self, label, pct, suffix=''):
+        return f'{label} {self._color_gradient(pct)}{self._bar(pct)}{RESET} {suffix}({round(pct)}%)' if suffix else f'{label} {self._color_gradient(pct)}{self._bar(pct)} {round(pct)}%{RESET}'
 
 
 class BrailleStyle(Style):
@@ -157,8 +181,8 @@ class BrailleStyle(Style):
                 bar += self.BRAILLE[min(int(frac * 7), 7)]
         return bar
 
-    def _format(self, label, pct):
-        return f'{DIM}{label}{RESET} {self._color_gradient(pct)}{self._bar(pct)}{RESET} {round(pct)}%'
+    def _format(self, label, pct, suffix=''):
+        return f'{DIM}{label}{RESET} {self._color_gradient(pct)}{self._bar(pct)}{RESET} {suffix}({round(pct)}%)' if suffix else f'{DIM}{label}{RESET} {self._color_gradient(pct)}{self._bar(pct)}{RESET} {round(pct)}%'
 
 
 
@@ -193,8 +217,8 @@ class AsciiStyle(Style):
                 bar += self.RAMP[min(int(frac * n), n)]
         return bar
 
-    def _format(self, label, pct):
-        return f'{DIM}{label}{RESET} {self._color_gradient(pct)}[{self._bar(pct)}]{RESET} {round(pct)}%'
+    def _format(self, label, pct, suffix=''):
+        return f'{DIM}{label}{RESET} {self._color_gradient(pct)}[{self._bar(pct)}]{RESET} {suffix}({round(pct)}%)' if suffix else f'{DIM}{label}{RESET} {self._color_gradient(pct)}[{self._bar(pct)}]{RESET} {round(pct)}%'
 
 
 class WeatherStyle(Style):
@@ -212,8 +236,8 @@ class WeatherStyle(Style):
         else:
             return self.WEATHER[4]
 
-    def _format(self, label, pct):
-        return f'{DIM}{label}{RESET} {self._icon(pct)} {round(pct)}%'
+    def _format(self, label, pct, suffix=''):
+        return f'{DIM}{label}{RESET} {self._icon(pct)} {suffix}({round(pct)}%)' if suffix else f'{DIM}{label}{RESET} {self._icon(pct)} {round(pct)}%'
 
 
 STYLES = {
@@ -228,9 +252,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--style', choices=STYLES, default='simple')
     parser.add_argument('--token', action='store_true', default=False)
+    parser.add_argument('--git', action='store_true', default=False)
     parser.add_argument('--debug', action='store_true', default=False)
     args = parser.parse_args()
 
     raw = sys.stdin.read()
     data = json.loads(raw)
-    STYLES[args.style].render(data, debug=args.debug, show_token=args.token)
+    STYLES[args.style].render(data, debug=args.debug, show_token=args.token, show_git=args.git)

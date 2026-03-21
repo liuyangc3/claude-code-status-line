@@ -6,6 +6,13 @@
 - Fix status line not showing on first load when Claude Code sends null values in status JSON
 - Use `or {}` / `or 0` instead of `.get()` defaults to handle JSON null values for `model`, `context_window`, `rate_limits`, and token counts
 
+### Added
+- `--git` flag to show current git branch (e.g. `⎇ main`) in pink after context info
+
+### Changed
+- Context display now shows token usage: `ctx ⣿⣿⣄ [23.4k/200k](30%)`
+- Use ASCII pipe `|` separator instead of Unicode `│`
+
 ## 0.2.0
 
 ### Added
