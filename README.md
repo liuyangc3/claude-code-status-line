@@ -72,6 +72,7 @@ Replace `braille` / `weather` with any style: `simple`, `gradient`, `braille`, `
 | `--style <name>` | Choose a style: `simple`, `gradient`, `braille`, `ascii`, `weather` (default: `simple`) |
 | `--token` | Show token usage (input/output) right-aligned on the status line |
 | `--git` | Show current git branch (e.g. `⎇ main`) in pink after context info |
+| `--tool` | Show total tool usage count (e.g. `Tools x3`) after git branch info |
 | `--debug` | Write diagnostics to `statusline.log` next to the script |
 
 ### Example with token display
