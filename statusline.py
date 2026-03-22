@@ -22,6 +22,13 @@ class Transcript:
     """Parse Claude Code transcript JSONL to extract tool usage."""
 
     @staticmethod
+    def session_id(transcript_path):
+        """Extract session ID (UUID) from transcript path."""
+        if not transcript_path:
+            return None
+        return Path(transcript_path).stem
+
+    @staticmethod
     def parse(transcript_path):
         """Return dict of {tool_name: count} from completed tool calls."""
         tool_map = {}   # id -> {name, target, status}
@@ -108,7 +115,7 @@ class Style:
     def _format(self, label, pct, suffix=''):
         return f'{label} {suffix}({round(pct)}%)' if suffix else f'{label} {round(pct)}%'
 
-    def _parts(self, data, show_git=False, show_tool=False):
+    def _parts(self, data, show_git=False):
         model = (data.get('model') or {}).get('display_name', 'Unknow')
         parts = [model]
 
@@ -123,13 +130,6 @@ class Style:
             branch = self._git_branch(data)
             if branch:
                 parts.append(f'\033[38;2;255;105;180m⎇ {branch}{RESET}')
-
-        if show_tool:
-            transcript_path = data.get('transcript_path')
-            tool_map = Transcript.parse(transcript_path)
-            total = len(tool_map)
-            if total:
-                parts.append(f'Tools x{total}')
 
         five = ((data.get('rate_limits') or {}).get('five_hour') or {}).get('used_percentage')
         if five is not None:
@@ -157,7 +157,7 @@ class Style:
         return None
 
     def render(self, data, debug=False, show_token=False, show_git=False, show_tool=False):
-        parts = self._parts(data, show_git=show_git, show_tool=show_tool)
+        parts = self._parts(data, show_git=show_git)
         left = f' {DIM}|{RESET} '.join(parts)
         if not show_token:
             print(left, end='')
@@ -175,6 +175,23 @@ class Style:
                 print(left + ' ' * pad + token, end='')
             else:
                 print(left + f' {DIM}|{RESET} ' + token, end='')
+
+        if show_tool:
+            transcript_path = data.get('transcript_path')
+            tool_map = Transcript.parse(transcript_path)
+            running, completed = Transcript.summarize(tool_map)
+            tool_parts = []
+            for name in running[-2:]:
+                tool_parts.append(f'\033[33m◐{RESET} {name}')
+            for name, count in completed:
+                tool_parts.append(f'\033[32m✓{RESET} {name} {DIM}x{count}{RESET}')
+            if tool_parts:
+                print('\n' + f' {DIM}|{RESET} '.join(tool_parts), end='')
+
+        if debug:
+            session_id = Transcript.session_id(data.get('transcript_path'))
+            if session_id:
+                print(f'\n{DIM}session: {session_id}{RESET}', end='')
 
 
 class SimpleStyle(Style):
