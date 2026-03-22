@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+### Added
+- `--tool` flag to show tool usage count (e.g. `Tools x3`) inline on the status line
+- `Transcript` class to parse Claude Code transcript JSONL and count tool calls
+
 ## 0.3.0
 
 ### Added

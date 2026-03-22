@@ -18,6 +18,57 @@ DIM = '\033[2m'
 ANSI_RE = re.compile(r'\033\[[0-9;]*m')
 
 
+class Transcript:
+    """Parse Claude Code transcript JSONL to extract tool usage."""
+
+    @staticmethod
+    def parse(transcript_path):
+        """Return dict of {tool_name: count} from completed tool calls."""
+        tool_map = {}   # id -> {name, target, status}
+        if not transcript_path or not Path(transcript_path).exists():
+            return {}
+        try:
+            with open(transcript_path) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    content = (entry.get('message') or {}).get('content')
+                    if not isinstance(content, list):
+                        continue
+                    for block in content:
+                        btype = block.get('type')
+                        if btype == 'tool_use' and block.get('id') and block.get('name'):
+                            name = block['name']
+                            if name in ('Task', 'TodoWrite', 'TaskCreate', 'TaskUpdate'):
+                                continue
+                            tool_map[block['id']] = {'name': name, 'status': 'running'}
+                        elif btype == 'tool_result' and block.get('tool_use_id'):
+                            tool = tool_map.get(block['tool_use_id'])
+                            if tool:
+                                tool['status'] = 'error' if block.get('is_error') else 'completed'
+        except OSError:
+            pass
+        return tool_map
+
+    @staticmethod
+    def summarize(tool_map):
+        """Return list of (name, count) sorted by count desc for completed tools."""
+        counts = {}
+        running = []
+        for tool in tool_map.values():
+            if tool['status'] == 'completed':
+                counts[tool['name']] = counts.get(tool['name'], 0) + 1
+            elif tool['status'] == 'running':
+                running.append(tool['name'])
+        completed = sorted(counts.items(), key=lambda x: -x[1])
+        return running, completed
+
+
 class TokenInfo:
     @staticmethod
     def visible_len(s):
@@ -57,7 +108,7 @@ class Style:
     def _format(self, label, pct, suffix=''):
         return f'{label} {suffix}({round(pct)}%)' if suffix else f'{label} {round(pct)}%'
 
-    def _parts(self, data, show_git=False):
+    def _parts(self, data, show_git=False, show_tool=False):
         model = (data.get('model') or {}).get('display_name', 'Unknow')
         parts = [model]
 
@@ -72,6 +123,13 @@ class Style:
             branch = self._git_branch(data)
             if branch:
                 parts.append(f'\033[38;2;255;105;180m⎇ {branch}{RESET}')
+
+        if show_tool:
+            transcript_path = data.get('transcript_path')
+            tool_map = Transcript.parse(transcript_path)
+            total = len(tool_map)
+            if total:
+                parts.append(f'Tools x{total}')
 
         five = ((data.get('rate_limits') or {}).get('five_hour') or {}).get('used_percentage')
         if five is not None:
@@ -98,25 +156,25 @@ class Style:
             pass
         return None
 
-    def render(self, data, debug=False, show_token=False, show_git=False):
-        parts = self._parts(data, show_git=show_git)
+    def render(self, data, debug=False, show_token=False, show_git=False, show_tool=False):
+        parts = self._parts(data, show_git=show_git, show_tool=show_tool)
         left = f' {DIM}|{RESET} '.join(parts)
         if not show_token:
             print(left, end='')
-            return
-        token = TokenInfo.format(data)
-        width = TokenInfo.get_terminal_width()
-        left_len = TokenInfo.visible_len(left)
-        token_len = TokenInfo.visible_len(token)
-        token_col = width - token_len + 1
-        if debug:
-            diag = f'width={width} left={left_len} token={token_len} col={token_col}\n'
-            Path(__file__).parent.joinpath('statusline.log').write_text(diag)
-        pad = width - left_len - token_len - 8  # reserve 8 chars for Claude Code's right-side UI
-        if pad >= 2:
-            print(left + ' ' * pad + token, end='')
         else:
-            print(left + f' {DIM}|{RESET} ' + token, end='')
+            token = TokenInfo.format(data)
+            width = TokenInfo.get_terminal_width()
+            left_len = TokenInfo.visible_len(left)
+            token_len = TokenInfo.visible_len(token)
+            token_col = width - token_len + 1
+            if debug:
+                diag = f'width={width} left={left_len} token={token_len} col={token_col}\n'
+                Path(__file__).parent.joinpath('statusline.log').write_text(diag)
+            pad = width - left_len - token_len - 8  # reserve 8 chars for Claude Code's right-side UI
+            if pad >= 2:
+                print(left + ' ' * pad + token, end='')
+            else:
+                print(left + f' {DIM}|{RESET} ' + token, end='')
 
 
 class SimpleStyle(Style):
@@ -253,9 +311,12 @@ if __name__ == '__main__':
     parser.add_argument('--style', choices=STYLES, default='simple')
     parser.add_argument('--token', action='store_true', default=False)
     parser.add_argument('--git', action='store_true', default=False)
+    parser.add_argument('--tool', action='store_true', default=False)
     parser.add_argument('--debug', action='store_true', default=False)
     args = parser.parse_args()
 
     raw = sys.stdin.read()
     data = json.loads(raw)
-    STYLES[args.style].render(data, debug=args.debug, show_token=args.token, show_git=args.git)
+    if args.debug:
+        Path(__file__).parent.joinpath('statusline_input.log').write_text(raw)
+    STYLES[args.style].render(data, debug=args.debug, show_token=args.token, show_git=args.git, show_tool=args.tool)
